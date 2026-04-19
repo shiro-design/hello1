@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Teachable Machine - Camera Realtime</title>
+
+<style>
+body {
+    font-family: Arial;
+    text-align: center;
+}
+
+#result {
+    font-size: 24px;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+canvas {
+    margin-top: 10px;
+    border: 1px solid black;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Nhận diện bằng Camera (Realtime)</h2>
+
+<button onclick="init()">Start Camera</button>
+<button onclick="stopCamera()">Stop</button>
+
+<div id="webcam-container"></div>
+
+<h2 id="result">Kết quả: ...</h2>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+<script>
+const MODEL_URL = "./nhip1/";
+
+let model, webcam;
+let running = false;
+
+// ================= LOAD MODEL =================
+async function loadModel() {
+    console.log("Loading model...");
+
+    const modelURL = MODEL_URL + "model.json";
+    const metadataURL = MODEL_URL + "metadata.json";
+
+    model = await tmImage.load(modelURL, metadataURL);
+
+    console.log("Model loaded OK");
+}
+
+// ================= START CAMERA =================
+async function init() {
+    if (!model) await loadModel();
+
+    webcam = new tmImage.Webcam(300, 300, true); // flip = true cho giống gương
+
+    await webcam.setup(); // xin quyền camera
+    await webcam.play();
+
+    document.getElementById("webcam-container").innerHTML = "";
+    document.getElementById("webcam-container").appendChild(webcam.canvas);
+
+    running = true;
+
+    loop();
+}
+
+// ================= STOP CAMERA =================
+function stopCamera() {
+    running = false;
+
+    if (webcam) {
+        webcam.stop();
+    }
+
+    document.getElementById("result").innerText = "Kết quả: ...";
+}
+
+// ================= LOOP REALTIME =================
+async function loop() {
+    if (!running) return;
+
+    webcam.update();
+
+    await predict(webcam.canvas);
+
+    requestAnimationFrame(loop);
+}
+
+// ================= PREDICT =================
+async function predict(image) {
+    const prediction = await model.predict(image);
+
+    let best = prediction[0];
+
+    for (let i = 1; i < prediction.length; i++) {
+        if (prediction[i].probability > best.probability) {
+            best = prediction[i];
+        }
+    }
+
+    document.getElementById("result").innerText =
+        best.className + " (" + (best.probability * 100).toFixed(1) + "%)";
+}
+</script>
+
+</body>
+</html>
