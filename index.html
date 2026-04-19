@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Multi Model Camera Realtime</title>
+<title>Multi Model Camera AI</title>
 
 <style>
 body {
@@ -32,16 +32,15 @@ button:hover {
 
 #webcam-container {
     margin-top: 10px;
-    height: 70vh;
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
+/* 🔥 FIX QUAN TRỌNG: KHÔNG ZOOM */
 #webcam-container canvas {
-    width: 50vw;
-    height: 70vh;
-    object-fit: cover;
+    width: 320px;
+    height: 320px;
     border: 3px solid black;
     border-radius: 10px;
 }
@@ -56,9 +55,9 @@ button:hover {
 
 <body>
 
-<h2>Nhận diện Nhịp (Realtime AI)</h2>
+<h2>Nhận diện Nhịp (AI Realtime)</h2>
 
-<!-- 3 NÚT MODEL -->
+<!-- MODEL BUTTONS -->
 <button onclick="startModel('nhip1')">Nhịp 1</button>
 <button onclick="startModel('nhip2')">Nhịp 2</button>
 <button onclick="startModel('nhip4')">Nhịp 4</button>
@@ -80,17 +79,14 @@ let model = null;
 let webcam = null;
 let running = false;
 let currentModel = "";
+let loopId = null;
 
 // ================= LOAD MODEL =================
 async function loadModel(folder) {
     const modelURL = "./" + folder + "/model.json";
     const metadataURL = "./" + folder + "/metadata.json";
 
-    console.log("Loading:", folder);
-
     model = await tmImage.load(modelURL, metadataURL);
-
-    console.log("Loaded:", folder);
 }
 
 // ================= START MODEL =================
@@ -98,17 +94,19 @@ async function startModel(folder) {
 
     currentModel = folder;
 
-    // STOP OLD SESSION
+    // STOP OLD
     running = false;
+
+    if (loopId) cancelAnimationFrame(loopId);
+
     if (webcam) {
         webcam.stop();
     }
 
-    // LOAD MODEL
     await loadModel(folder);
 
-    // START CAMERA
-    webcam = new tmImage.Webcam(300, 300, true);
+    // CAMERA (KHÔNG ZOOM)
+    webcam = new tmImage.Webcam(320, 320, false);
 
     await webcam.setup();
     await webcam.play();
@@ -118,7 +116,6 @@ async function startModel(folder) {
     container.appendChild(webcam.canvas);
 
     running = true;
-
     loop();
 }
 
@@ -126,9 +123,9 @@ async function startModel(folder) {
 function stopCamera() {
     running = false;
 
-    if (webcam) {
-        webcam.stop();
-    }
+    if (loopId) cancelAnimationFrame(loopId);
+
+    if (webcam) webcam.stop();
 
     document.getElementById("result").innerText = "Kết quả: ...";
 }
@@ -141,7 +138,7 @@ async function loop() {
 
     await predict(webcam.canvas);
 
-    requestAnimationFrame(loop);
+    loopId = requestAnimationFrame(loop);
 }
 
 // ================= PREDICT =================
@@ -152,11 +149,11 @@ async function predict(image) {
 
     let best = prediction[0];
 
-    prediction.forEach(p => {
-        if (p.probability > best.probability) {
-            best = p;
+    for (let i = 1; i < prediction.length; i++) {
+        if (prediction[i].probability > best.probability) {
+            best = prediction[i];
         }
-    });
+    }
 
     document.getElementById("result").innerText =
         "MODEL: " + currentModel.toUpperCase() +
