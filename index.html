@@ -2,32 +2,69 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Teachable Machine - Camera Realtime</title>
+<title>Multi Model Camera Realtime</title>
 
 <style>
 body {
     font-family: Arial;
     text-align: center;
+    margin: 0;
+    background: #f5f5f5;
+}
+
+h2 {
+    margin-top: 20px;
+}
+
+button {
+    padding: 12px 18px;
+    margin: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    border: 1px solid #333;
+    background: white;
+    border-radius: 6px;
+}
+
+button:hover {
+    background: #eee;
+}
+
+#webcam-container {
+    margin-top: 10px;
+    height: 70vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#webcam-container canvas {
+    width: 50vw;
+    height: 70vh;
+    object-fit: cover;
+    border: 3px solid black;
+    border-radius: 10px;
 }
 
 #result {
-    font-size: 24px;
+    font-size: 26px;
     margin-top: 15px;
     font-weight: bold;
-}
-
-canvas {
-    margin-top: 10px;
-    border: 1px solid black;
 }
 </style>
 </head>
 
 <body>
 
-<h2>Nhận diện bằng Camera (Realtime)</h2>
+<h2>Nhận diện Nhịp (Realtime AI)</h2>
 
-<button onclick="init()">Start Camera</button>
+<!-- 3 NÚT MODEL -->
+<button onclick="startModel('nhip1')">Nhịp 1</button>
+<button onclick="startModel('nhip2')">Nhịp 2</button>
+<button onclick="startModel('nhip4')">Nhịp 4</button>
+
+<br>
+
 <button onclick="stopCamera()">Stop</button>
 
 <div id="webcam-container"></div>
@@ -38,41 +75,54 @@ canvas {
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
 <script>
-const MODEL_URL = "./nhip1/";
 
-let model, webcam;
+let model = null;
+let webcam = null;
 let running = false;
+let currentModel = "";
 
 // ================= LOAD MODEL =================
-async function loadModel() {
-    console.log("Loading model...");
+async function loadModel(folder) {
+    const modelURL = "./" + folder + "/model.json";
+    const metadataURL = "./" + folder + "/metadata.json";
 
-    const modelURL = MODEL_URL + "model.json";
-    const metadataURL = MODEL_URL + "metadata.json";
+    console.log("Loading:", folder);
 
     model = await tmImage.load(modelURL, metadataURL);
 
-    console.log("Model loaded OK");
+    console.log("Loaded:", folder);
 }
 
-// ================= START CAMERA =================
-async function init() {
-    if (!model) await loadModel();
+// ================= START MODEL =================
+async function startModel(folder) {
 
-    webcam = new tmImage.Webcam(300, 300, true); // flip = true cho giống gương
+    currentModel = folder;
 
-    await webcam.setup(); // xin quyền camera
+    // STOP OLD SESSION
+    running = false;
+    if (webcam) {
+        webcam.stop();
+    }
+
+    // LOAD MODEL
+    await loadModel(folder);
+
+    // START CAMERA
+    webcam = new tmImage.Webcam(300, 300, true);
+
+    await webcam.setup();
     await webcam.play();
 
-    document.getElementById("webcam-container").innerHTML = "";
-    document.getElementById("webcam-container").appendChild(webcam.canvas);
+    const container = document.getElementById("webcam-container");
+    container.innerHTML = "";
+    container.appendChild(webcam.canvas);
 
     running = true;
 
     loop();
 }
 
-// ================= STOP CAMERA =================
+// ================= STOP =================
 function stopCamera() {
     running = false;
 
@@ -83,7 +133,7 @@ function stopCamera() {
     document.getElementById("result").innerText = "Kết quả: ...";
 }
 
-// ================= LOOP REALTIME =================
+// ================= LOOP =================
 async function loop() {
     if (!running) return;
 
@@ -96,19 +146,25 @@ async function loop() {
 
 // ================= PREDICT =================
 async function predict(image) {
+    if (!model) return;
+
     const prediction = await model.predict(image);
 
     let best = prediction[0];
 
-    for (let i = 1; i < prediction.length; i++) {
-        if (prediction[i].probability > best.probability) {
-            best = prediction[i];
+    prediction.forEach(p => {
+        if (p.probability > best.probability) {
+            best = p;
         }
-    }
+    });
 
     document.getElementById("result").innerText =
-        best.className + " (" + (best.probability * 100).toFixed(1) + "%)";
+        "MODEL: " + currentModel.toUpperCase() +
+        " → " +
+        best.className +
+        " (" + (best.probability * 100).toFixed(1) + "%)";
 }
+
 </script>
 
 </body>
